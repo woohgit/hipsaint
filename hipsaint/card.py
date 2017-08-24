@@ -16,26 +16,6 @@ class Card(object):
             self.service, self.hostalias, self.timestamp, self.ntype, self.hostaddress, self.state, self.hostoutput = [
                 inp.strip() for inp in self.inputs.split('|')]
 
-    def get_style_old(self):
-        """
-        Style mapping for the supported atlassian lozenge styles.
-        For more see: https://docs.atlassian.com/aui/latest/docs/lozenges.html
-        """
-        state_mapping = {
-            'CRITICAL': 'lozenge-error',
-            'WARNING': 'lozenge-current',
-            'OK': 'lozenge-success',
-            'UNKNOWN': 'lozenge',
-            'DOWN': 'lozenge-error',
-            'UP': 'lozenge-success',
-            'UNREACHABLE': 'lozenge-error'
-        }
-
-        if self.state not in state_mapping:
-            return 'lozenge'
-        else:
-            return state_mapping[self.state]
-
     def get_attributes(self):
         """
         More about Card attributes:
