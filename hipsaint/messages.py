@@ -19,6 +19,7 @@ import socket
 import json
 from .options import COLORS
 from .templates import templates
+from .card import Card
 
 logging.basicConfig()
 log = logging.getLogger(__name__)
@@ -28,7 +29,7 @@ class HipchatMessage(object):
     default_color = 'red'
 
     def __init__(self, msg_type, inputs, token, user, room_id, notify, api_host,
-                 api_version, proxy=None, msg_format='html'):
+                 api_version, proxy=None, msg_format='html', use_card=False):
         self.type = msg_type
         self.inputs = inputs
         self.inputs_list = [inp.strip() for inp in self.inputs.split('|')]
@@ -50,9 +51,14 @@ class HipchatMessage(object):
         if str(self.api_version) != "2":
             self.url = self.urlv1
             self.deliver_payload = self.deliver_payload_v1
+            self.card = None
         else:
             self.url = self.urlv2
             self.deliver_payload = self.deliver_payload_v2
+            if use_card:
+                self.card = Card(self.inputs, self.type)
+            else:
+                self.card = None
 
     def deliver_payload_v1(self, **kwargs):
         """
@@ -81,9 +87,11 @@ class HipchatMessage(object):
         according to API Documentation https://hipchat.corvisa.com/docs/apiv2/method/send_room_notification
         """
         message_body = self.render_message()
+        card = self.card.get_card() if self.card else None
         message = {'message': message_body,
                    'color': self.message_color,
                    'notify': int(self.notify) > 0,
+                   'card': card,
                    'message_format': self.message_format}
         message_params = json.dumps(message)
         message_params = message_params.encode('utf-8')

@@ -1,4 +1,4 @@
-VERSION = (0, 7, 0, 'final', 0)
+VERSION = (0, 7, 1, 'final', 0)
 
 
 def get_version(version=None):
@@ -22,5 +22,6 @@ def get_version(version=None):
         sub = mapping[version[3]] + str(version[4])
 
     return main + sub
+
 
 __version__ = get_version()

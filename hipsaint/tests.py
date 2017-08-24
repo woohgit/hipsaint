@@ -4,6 +4,7 @@ import mock
 from datetime import datetime
 import json
 from .messages import HipchatMessage
+from .card import Card, ICON_URL
 
 
 def setup_mock_request(mock_method, status_code, json_data):
@@ -101,7 +102,6 @@ class MessageTest(unittest.TestCase):
         self.assertEqual(data['notify'], False)
         self.assertEqual(data['message_format'], 'html')
 
-
     def test_render_host(self):
         message_type = 'host'
         msg_inputs = self.host_inputs % {'longdatetime': datetime.now(),
@@ -178,3 +178,215 @@ class MessageTest(unittest.TestCase):
         problem_msg = HipchatMessage(message_type, msg_inputs, None, None, None, False, None, None)
         problem_msg.render_message()
         self.assertEqual(problem_msg.message_color, 'purple')
+
+
+class CardTest(unittest.TestCase):
+
+    def setUp(self):
+        # "$HOSTNAME$|$LONGDATETIME$|$NOTIFICATIONTYPE$|$HOSTADDRESS$|$HOSTSTATE$|$HOSTOUTPUT$"
+        self.host_inputs = 'hostname|%(longdatetime)s|%(notificationtype)s|127.0.0.1|' \
+                '%(hoststate)s|NAGIOS_OUTPUT'
+
+        self.service_inputs = 'servicedesc|hostalias|%(longdatetime)s|%(notificationtype)s|' \
+                              '127.0.0.1|%(servicestate)s|NAGIOS_OUTPUT'
+
+    def test_card_attributes(self):
+        parameters = {
+            'PROBLEM1': {
+                'ntype': 'PROBLEM',
+                'state': 'CRITICAL',
+                'style': 'lozenge-error'},
+            'PROBLEM2': {
+                'ntype': 'PROBLEM',
+                'state': 'WARNING',
+                'style': 'lozenge-current'},
+            'PROBLEM3': {
+                'ntype': 'PROBLEM',
+                'state': 'DOWN',
+                'style': 'lozenge-error'},
+            'RECOVERY1': {
+                'ntype': 'RECOVERY',
+                'state': 'OK',
+                'style': 'lozenge-success'},
+            'RECOVERY2': {
+                'ntype': 'RECOVERY',
+                'state': 'UP',
+                'style': 'lozenge-success'},
+            'PROBLEM4': {
+                'ntype': 'PROBLEM',
+                'state': 'UNREACHABLE',
+                'style': 'lozenge-error'},
+            'ACKNOWLEDGEMENT': {
+                'ntype': 'ACKNOWLEDGEMENT',
+                'state': 'DOWN',
+                'style': 'lozenge-error'}}
+
+        for p in parameters:
+            msg_inputs = self.host_inputs % {
+                'longdatetime': datetime.now(),
+                'notificationtype': parameters[p]['ntype'],
+                'hoststate': parameters[p]['state']}
+
+            card = Card(msg_inputs, 'host')
+            attributes = [
+                {
+                    'value': {
+                        'label': parameters[p]['ntype']
+                    },
+                    'label': 'Type'
+                },
+                {
+                    'value': {
+                        'label': parameters[p]['state'],
+                        'style': parameters[p]['style']
+                    },
+                    'label': 'State'
+                },
+                {
+                    'value': {
+                        'label': '%s (%s)' % ('hostname', '127.0.0.1')
+                    },
+                    'label': 'Host'
+                }]
+            self.assertEqual(card.get_attributes(), attributes)
+
+    def test_card_activity(self):
+        timestamp = datetime.now()
+        parameters = {
+            'PRO': {
+                'ntype': 'PROBLEM',
+                'state': 'CRITICAL',
+                'style': 'lozenge-error',
+                'timestamp': timestamp},
+            'REC': {
+                'ntype': 'RECOVERY',
+                'state': 'OK',
+                'style': 'lozenge-success',
+                'timestamp': timestamp},
+            'ACK': {
+                'ntype': 'ACKNOWLEDGEMENT',
+                'state': 'CRITICAL',
+                'style': 'lozenge',
+                'timestamp': timestamp},
+            'FLIPSTART': {
+                'ntype': 'FLAPPINGSTART',
+                'state': 'CRITICAL',
+                'style': 'lozenge-current',
+                'timestamp': timestamp},
+            'DOWNTIMESTART': {
+                'ntype': 'DOWNTIMESTART',
+                'state': 'CRITICAL',
+                'style': 'lozenge-error',
+                'timestamp': timestamp}
+        }
+
+        for p in parameters:
+            msg_inputs = self.host_inputs % {
+                'longdatetime': timestamp,
+                'notificationtype': parameters[p]['ntype'],
+                'hoststate': parameters[p]['state']}
+
+            card = Card(msg_inputs, 'host')
+            activity = {
+                'html': '<b>hostname</b> (%(hostaddress)s) - <span class="aui-lozenge aui-%(style)s">%(ntype)s</span>' % {
+                    'hostaddress': '127.0.0.1',
+                    'style': parameters[p]['style'],
+                    'ntype': parameters[p]['ntype']},
+                'icon': ICON_URL}
+            self.assertEqual(card.get_activity(), activity)
+
+            msg_inputs = self.service_inputs % {
+                'longdatetime': timestamp,
+                'notificationtype': parameters[p]['ntype'],
+                'servicestate': parameters[p]['state']}
+
+            card = Card(msg_inputs, 'service')
+            activity = {
+                'html': '<b>servicedesc</b> on hostalias (%(hostaddress)s) - <span class="aui-lozenge aui-%(style)s">%(ntype)s</span>' % {
+                    'hostaddress': '127.0.0.1',
+                    'style': parameters[p]['style'],
+                    'ntype': parameters[p]['ntype']},
+                'icon': ICON_URL}
+            self.assertEqual(card.get_activity(), activity)
+
+    def test_card_title_and_description(self):
+        timestamp = datetime.now()
+        parameters = {'PRO-CRIT': {'ntype': 'PROBLEM',
+                                   'state': 'CRITICAL',
+                                   'style': 'lozenge-error',
+                                   'timestamp': timestamp},
+                      'PRO-WARN': {'ntype': 'PROBLEM',
+                                   'state': 'WARNING',
+                                   'style': 'lozenge-error',
+                                   'timestamp': timestamp},
+                      'REC': {'ntype': 'RECOVERY',
+                              'state': 'OK',
+                              'style': 'lozenge-success',
+                              'timestamp': timestamp},
+                      'UNR': {'ntype': 'UNREACHABLE',
+                              'state': 'CRITICAL',
+                              'style': 'lozenge-error',
+                              'timestamp': timestamp},
+                      'ACK': {'ntype': 'ACKNOWLEDGEMENT',
+                              'state': 'CRITICAL',
+                              'style': 'lozenge-error',
+                              'timestamp': timestamp}}
+
+        for p in parameters:
+            msg_inputs = self.host_inputs % {
+                'longdatetime': timestamp,
+                'notificationtype': parameters[p]['ntype'],
+                'hoststate': parameters[p]['state']}
+
+            expected_title = '%(ntype)s - %(hostname)s (%(hostaddress)s) is %(state)s' % {
+                'ntype': parameters[p]['ntype'],
+                'hostname': 'hostname',
+                'hostaddress': '127.0.0.1',
+                'state': parameters[p]['state']
+            }
+
+            card = Card(msg_inputs, 'host')
+            cardObject = card.get_card()
+            self.assertEquals(cardObject['title'], expected_title)
+            self.assertEquals(cardObject['description'], 'NAGIOS_OUTPUT')
+
+    def test_service_card(self):
+        timestamp = datetime.now()
+        parameters = {'PRO-CRIT': {'ntype': 'PROBLEM',
+                                   'state': 'CRITICAL',
+                                   'style': 'lozenge-error',
+                                   'timestamp': timestamp},
+                      'PRO-WARN': {'ntype': 'PROBLEM',
+                                   'state': 'WARNING',
+                                   'style': 'lozenge-error',
+                                   'timestamp': timestamp},
+                      'REC': {'ntype': 'RECOVERY',
+                              'state': 'OK',
+                              'style': 'lozenge-success',
+                              'timestamp': timestamp},
+                      'UNR': {'ntype': 'UNREACHABLE',
+                              'state': 'CRITICAL',
+                              'style': 'lozenge-error',
+                              'timestamp': timestamp},
+                      'ACK': {'ntype': 'ACKNOWLEDGEMENT',
+                              'state': 'CRITICAL',
+                              'style': 'lozenge-error',
+                              'timestamp': timestamp}}
+
+        for p in parameters:
+            msg_inputs = self.service_inputs % {
+                'longdatetime': timestamp,
+                'notificationtype': parameters[p]['ntype'],
+                'servicestate': parameters[p]['state']}
+
+            expected_title = '%(ntype)s - servicedesc on hostalias (%(hostaddress)s) is %(state)s' % {
+                'ntype': parameters[p]['ntype'],
+                'hostaddress': '127.0.0.1',
+                'state': parameters[p]['state']
+            }
+
+            card = Card(msg_inputs, 'service')
+            cardObject = card.get_card()
+
+            self.assertEquals(cardObject['title'], expected_title)
+            self.assertEquals(cardObject['description'], 'NAGIOS_OUTPUT')

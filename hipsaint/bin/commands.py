@@ -63,9 +63,16 @@ def main():
                       dest="proxy",
                       help="Specify a proxy in the form [user:passwd@]proxy.server:port.")
 
-    ### Parse command line
+    parser.add_option("-c", "--card",
+                      action="store_true",
+                      default=False,
+                      dest="use_card",
+                      help="Wether or not use HipChat API v2 Card support or not. "
+                      "It requires using the V2 API.")
+
+    # Parse command line
     (options, args) = parser.parse_args()
-    ### Validate required input
+    # Validate required input
     if not options.token:
         parser.error('--token is required')
     if not options.inputs:
