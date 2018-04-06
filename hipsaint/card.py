@@ -16,6 +16,16 @@ class Card(object):
             self.service, self.hostalias, self.timestamp, self.ntype, self.hostaddress, self.state, self.hostoutput = [
                 inp.strip() for inp in self.inputs.split('|')]
 
+        # Ensure len of message body does not exceed limits
+        # https://www.hipchat.com/docs/apiv2/method/send_room_notification
+        msg_body_len = len(self.hostoutput)
+
+        if msg_body_len >= 500:
+            logging.warning('Host/Service ouput exceeds maximum allowed by V2 API: 500 ' \
+                + 'characters. Requested: ' + str(msg_body_len) \
+                + '. Truncating output to 500 total characters')
+            self.hostoutput = self.hostoutput[:487] + ' <truncated>"
+            
     def get_attributes(self):
         """
         More about Card attributes:
